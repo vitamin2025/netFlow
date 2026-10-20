@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NetRoute</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #16181d; --muted: #6b7280; --line: #e5e7eb;
+  --accent: #2563eb; --local: #9ca3af; --isp: #2563eb; --dc: #ea580c; --mobile: #7c3aed;
+  --unknown: #a1a1aa; --ok: #16a34a; --bad: #dc2626;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1013; --panel: #171a1f; --text: #e8eaed; --muted: #9aa0a8; --line: #2a2e35;
+    --accent: #60a5fa; --local: #6b7280; --isp: #60a5fa; --dc: #fb923c; --mobile: #a78bfa;
+    --unknown: #71717a;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+h1 { font-size: 17px; margin: 0; letter-spacing: -.01em; }
+h1 span { color: var(--accent); }
+#me { color: var(--muted); font-size: 13px; }
+#me b { color: var(--text); font-weight: 600; }
+nav { margin-left: auto; display: flex; gap: 4px; }
+nav button { background: none; border: 1px solid transparent; color: var(--muted);
+  padding: 6px 12px; border-radius: 8px; cursor: pointer; font: inherit; }
+nav button.on { color: var(--text); border-color: var(--line); background: var(--bg); }
+main { padding: 16px 20px; max-width: 1400px; margin: 0 auto; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+input[type=text] { flex: 1 1 260px; min-width: 0; padding: 9px 12px; font: inherit; color: var(--text);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.btn { padding: 9px 16px; border-radius: 8px; border: 0; background: var(--accent); color: #fff;
+  font: inherit; font-weight: 600; cursor: pointer; }
+.btn.ghost { background: none; color: var(--text); border: 1px solid var(--line); font-weight: 500; }
+.btn:disabled { opacity: .5; cursor: default; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { font-size: 12px; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--muted); cursor: pointer; }
+.chip:hover { color: var(--text); }
+#status { color: var(--muted); font-size: 13px; margin: 0 0 12px; min-height: 19px; }
+#status.err { color: var(--bad); }
+.grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+#map { height: 520px; border-radius: 12px; overflow: hidden; }
+.leaflet-container { background: var(--bg); }
+.tiles-dark { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+  margin: 0 0 10px; font-weight: 600; }
+.section { padding: 14px 16px; }
+.section + .section { border-top: 1px solid var(--line); }
+#path { display: flex; flex-direction: column; gap: 0; }
+.net { display: grid; grid-template-columns: 14px 1fr auto; gap: 10px; align-items: start; }
+.net .dot { width: 12px; height: 12px; border-radius: 50%; margin-top: 4px; position: relative; }
+.net:not(:last-child) .dot::after { content: ""; position: absolute; left: 5px; top: 13px;
+  width: 2px; height: 30px; background: var(--line); }
+.net .name { font-weight: 600; }
+.net .sub { color: var(--muted); font-size: 12px; }
+.net .hops { color: var(--muted); font-size: 12px; white-space: nowrap; padding-top: 2px; }
+.net + .net { margin-top: 10px; }
+.badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 7px;
+  border-radius: 999px; color: #fff; vertical-align: 1px; white-space: nowrap; }
+.k-local { background: var(--local); } .k-isp { background: var(--isp); }
+.k-datacenter { background: var(--dc); } .k-mobile { background: var(--mobile); }
+.k-unknown, .k-timeout { background: var(--unknown); }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px;
+  padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.rtt { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.rtt i { display: block; height: 4px; border-radius: 2px; background: var(--accent); opacity: .6; }
+.jump { color: var(--dc); font-weight: 600; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 9px; height: 9px;
+  border-radius: 50%; margin-right: 5px; background: var(--c); }
+.hopmark { width: 22px; height: 22px; border-radius: 50%; color: #fff; font-size: 11px;
+  font-weight: 700; display: grid; place-items: center; border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+.empty { color: var(--muted); padding: 24px 16px; text-align: center; }
+.bars { display: flex; flex-direction: column; gap: 6px; }
+.bar { display: grid; grid-template-columns: minmax(0, 220px) 1fr 40px; gap: 10px; align-items: center; font-size: 13px; }
+.bar .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar .track { height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+.bar .fill { height: 100%; background: var(--accent); border-radius: 4px; }
+.bar .fill.dc { background: var(--dc); }
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.toolbar input { flex: 1 1 220px; }
+[hidden] { display: none !important; }
+@media (max-width: 600px) {
+  header, main { padding-left: 16px; padding-right: 16px; }
+  #map { height: 340px; }
+  nav { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Net<span>Route</span></h1>
+  <div id="me">Detecting your ISP…</div>
+  <nav>
+    <button class="on" data-tab="trace">Route tracer</button>
+    <button data-tab="conns">Live connections</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ROUTE TRACER -->
+  <section id="tab-trace">
+    <form id="f">
+      <input type="text" id="target" placeholder="Domain or IP, e.g. netflix.com" autocomplete="off" spellcheck="false">
+      <button class="btn" id="go">Trace route</button>
+      <button class="btn ghost" id="stop" type="button" hidden>Stop</button>
+    </form>
+    <div class="chips" style="margin-bottom:12px">
+      <span class="chip">google.com</span><span class="chip">cloudflare.com</span>
+      <span class="chip">github.com</span><span class="chip">netflix.com</span>
+      <span class="chip">amazon.com</span><span class="chip">1.1.1.1</span><span class="chip">8.8.8.8</span>
+    </div>
+    <p id="status">Enter a destination to see every network your packets cross on the way.</p>
+
+    <div class="grid">
+      <div class="panel" style="padding:0"><div id="map"></div></div>
+      <div class="panel">
+        <div class="section">
+          <h2>Networks on the path</h2>
+          <div id="path"><div class="muted small">No trace yet.</div></div>
+        </div>
+        <div class="section">
+          <div class="legend">
+            <span style="--c:var(--local)">Local / private</span>
+            <span style="--c:var(--isp)">ISP / transit</span>
+            <span style="--c:var(--dc)">Datacenter / hosting / CDN</span>
+            <span style="--c:var(--mobile)">Mobile</span>
+            <span style="--c:var(--unknown)">No reply</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <div class="section"><h2>Every hop</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Type</th><th>IP / hostname</th><th>Network (ISP · org)</th><th>ASN</th><th>Location</th><th style="text-align:right">RTT</th></tr></thead>
+          <tbody id="hops"><tr><td colspan="7" class="empty">Hops appear here live as the trace runs.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- LIVE CONNECTIONS -->
+  <section id="tab-conns" hidden>
+    <div class="toolbar">
+      <button class="btn" id="refresh">Refresh connections</button>
+      <label class="small muted"><input type="checkbox" id="auto"> auto-refresh every 10s</label>
+      <input type="text" id="filter" placeholder="Filter by app, IP, ISP, country…">
+    </div>
+    <p id="cstatus" class="muted small" style="margin:0 0 12px">Shows open network connections of apps running as your user (via lsof).</p>
+    <div class="grid" style="margin-bottom:16px">
+      <div class="panel section"><h2>Networks you're talking to</h2><div id="bynet" class="bars"></div></div>
+      <div class="panel section"><h2>Apps with the most connections</h2><div id="byapp" class="bars"></div></div>
+    </div>
+    <div class="panel">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>App</th><th>Remote IP</th><th>Ports</th><th>Type</th><th>Network (ISP · org)</th><th>ASN</th><th>Location</th><th></th></tr></thead>
+          <tbody id="conns"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const KIND_LABEL = { local: "Local", isp: "ISP", datacenter: "Datacenter", mobile: "Mobile", unknown: "Unknown", timeout: "No reply" };
+const KIND_VAR = { local: "--local", isp: "--isp", datacenter: "--dc", mobile: "--mobile", unknown: "--unknown", timeout: "--unknown" };
+const badge = k => `<span class="badge k-${k}">${KIND_LABEL[k] || k}</span>`;
+const place = i => [i.city, i.region !== i.city ? i.region : "", i.country].filter(Boolean).join(", ");
+const netName = i => i.isp && i.org && i.org !== i.isp ? `${i.isp} · ${i.org}` : (i.isp || i.org || i.asname || "");
+
+/* ---------- tabs ---------- */
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+function showTab(t) {
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
+  $("#tab-trace").hidden = t !== "trace";
+  $("#tab-conns").hidden = t !== "conns";
+  if (t === "trace") setTimeout(() => map.invalidateSize(), 0);
+  if (t === "conns" && !connsLoaded) loadConns();
+}
+
+/* ---------- map ---------- */
+const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+const map = L.map("map", { worldCopyJump: true }).setView([25, 10], 2);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  maxZoom: 18, className: dark ? "tiles-dark" : ""
+}).addTo(map);
+let routeLayer = L.layerGroup().addTo(map);
+
+/* ---------- who am I ---------- */
+let me = null;
+fetch("/api/me").then(r => r.json()).then(d => {
+  if (d.error) { $("#me").textContent = "Couldn't detect your public IP"; return; }
+  me = d;
+  $("#me").innerHTML = `You: <b>${esc(d.ip)}</b> · <b>${esc(d.isp)}</b> ${esc(d.asn)} · ${esc(place(d))}`;
+});
+
+/* ---------- tracer ---------- */
+let es = null, hops = [], startT = 0, dest = null, endState = null;
+
+$("#f").onsubmit = e => { e.preventDefault(); const t = $("#target").value.trim(); if (t) trace(t); };
+document.querySelectorAll(".chip").forEach(c => c.onclick = () => { $("#target").value = c.textContent; trace(c.textContent); });
+$("#stop").onclick = () => finish("Stopped.");
+
+function setStatus(msg, err) { const s = $("#status"); s.textContent = msg; s.classList.toggle("err", !!err); }
+
+function trace(target) {
+  if (es) es.close();
+  hops = []; dest = null; endState = null; routeLayer.clearLayers(); startT = Date.now();
+  $("#hops").innerHTML = ""; $("#path").innerHTML = '<div class="muted small">Tracing…</div>';
+  $("#go").disabled = true; $("#stop").hidden = false;
+  setStatus(`Resolving ${target}…`);
+  es = new EventSource("/api/trace?target=" + encodeURIComponent(target));
+  es.onmessage = e => {
+    const ev = JSON.parse(e.data);
+    if (ev.type === "start") dest = ev.dest, setStatus(`Tracing ${ev.target} (${ev.ip}) — destination network: ${netName(ev.dest) || "unknown"}…`);
+    else if (ev.type === "hop") addHop(ev);
+    else if (ev.type === "error") finish(ev.message, true);
+    else if (ev.type === "done") { endState = ev; renderPath(); renderMap(); finish(summary()); }
+  };
+  es.onerror = () => { if (es) finish(hops.length ? summary() : "Connection to NetRoute server lost.", !hops.length); };
+}
+
+function finish(msg, err) {
+  if (es) { es.close(); es = null; }
+  $("#go").disabled = false; $("#stop").hidden = true;
+  setStatus(msg, err);
+}
+
+function summary() {
+  const nets = groupNetworks().filter(n => n.kind !== "local" && n.kind !== "timeout");
+  const secs = ((Date.now() - startT) / 1000).toFixed(1);
+  const tail = endState && endState.silent ? " The last routers (inside the destination network) don't answer traceroute, so the trace stopped early." : "";
+  return `Done in ${secs}s — ${hops.length} hops through ${nets.length} public network${nets.length === 1 ? "" : "s"}.${tail}`;
+}
+
+function addHop(ev) {
+  const i = ev.info;
+  const kind = i ? i.kind : "timeout";
+  hops.push({ ...ev, kind });
+  if (hops.length === 1) $("#hops").innerHTML = "";
+  const prev = [...hops].reverse().find((h, idx) => idx > 0 && h.rtt != null);
+  const jump = prev && ev.rtt != null && ev.rtt - prev.rtt > 40;
+  const maxRtt = Math.max(100, ...hops.map(h => h.rtt || 0));
+  const tr = document.createElement("tr");
+  tr.innerHTML = i ? `
+    <td class="num">${ev.hop}</td>
+    <td>${badge(kind)}</td>
+    <td><div class="mono">${esc(i.ip)}</div><div class="muted small mono">${esc(i.host || i.label || "")}</div></td>
+    <td>${esc(netName(i)) || '<span class="muted">—</span>'}</td>
+    <td class="mono">${esc(i.asn) || '<span class="muted">—</span>'}<div class="muted small">${esc(i.asname)}</div></td>
+    <td>${esc(place(i)) || '<span class="muted">—</span>'}</td>
+    <td class="num"><div class="rtt"><span class="${jump ? "jump" : ""}" title="${jump ? "Big latency jump — often a long-distance or undersea link" : ""}">${ev.rtt != null ? ev.rtt.toFixed(1) + " ms" : "—"}</span><i style="width:${ev.rtt ? Math.max(2, ev.rtt / maxRtt * 60) : 0}px"></i></div></td>`
+  : `<td class="num">${ev.hop}</td><td>${badge("timeout")}</td><td colspan="5" class="muted small">Router didn't reply (it hides itself from traceroute — traffic still passes through)</td>`;
+  $("#hops").appendChild(tr);
+  renderPath(); renderMap();
+}
+
+function groupNetworks() {
+  const out = [];
+  for (const h of hops) {
+    const i = h.info;
+    const key = !i ? "timeout" : i.kind === "local" ? "local:" + i.label : (i.asn || i.isp || i.ip);
+    const last = out[out.length - 1];
+    if (last && (last.key === key || (key === "timeout"))) { last.hops.push(h.hop); continue; }
+    out.push({ key, kind: h.kind, info: i, hops: [h.hop] });
+  }
+  return out.filter(n => n.key !== "timeout");
+}
+
+function renderPath() {
+  const nets = groupNetworks();
+  // If the destination never replied, still show which network it lives in.
+  if (endState && dest && dest.kind !== "unknown" && !hops.some(h => h.info && h.info.ip === dest.ip)) {
+    const last = nets[nets.length - 1];
+    const sameNet = last && last.info && dest.asn && last.info.asn === dest.asn;
+    if (sameNet) last.destHere = true;
+    else nets.push({ kind: dest.kind, info: dest, hops: [], dest: true });
+  }
+  if (!nets.length) { $("#path").innerHTML = '<div class="muted small">Waiting for replies…</div>'; return; }
+  $("#path").innerHTML = nets.map(n => {
+    const i = n.info;
+    const name = n.kind === "local" ? i.label : (i.isp || i.org || i.asname || i.ip);
+    const sub = n.kind === "local" ? "Your router / home or office network" :
+      [i.asn && `${i.asn} ${i.asname}`, i.org && i.org !== i.isp ? i.org : "", place(i)].filter(Boolean).join(" · ");
+    const range = n.dest ? "destination" : n.hops.length > 1 ? `hops ${n.hops[0]}–${n.hops[n.hops.length - 1]}` : `hop ${n.hops[0]}`;
+    return `<div class="net"><div class="dot" style="background:var(${KIND_VAR[n.kind]})"></div>
+      <div><div class="name">${esc(name)} ${badge(n.kind)}</div><div class="sub">${esc(sub)}</div>${n.dest || n.destHere ? `<div class="sub">🎯 ${esc(dest.ip)} lives here${n.dest ? " (it doesn't reply to traceroute)" : ""}</div>` : ""}</div>
+      <div class="hops">${range}</div></div>`;
+  }).join("");
+}
+
+function renderMap() {
+  routeLayer.clearLayers();
+  const pts = [];
+  if (me && me.lat != null) {
+    pts.push([me.lat, me.lon]);
+    L.marker([me.lat, me.lon], { icon: L.divIcon({ className: "", html: `<div class="hopmark" style="background:${css("--ok")}">●</div>`, iconSize: [22, 22], iconAnchor: [11, 11] }) })
+      .bindPopup(`<b>You</b><br>${esc(me.isp)}<br>${esc(place(me))}`).addTo(routeLayer);
+  }
+  // collapse consecutive hops at the same coordinates into one marker
+  const spots = [];
+  for (const h of hops) {
+    const i = h.info;
+    if (!i || i.lat == null) continue;
+    const last = spots[spots.length - 1];
+    if (last && last.lat === i.lat && last.lon === i.lon) { last.hops.push(h); continue; }
+    spots.push({ lat: i.lat, lon: i.lon, hops: [h] });
+  }
+  for (const s of spots) {
+    pts.push([s.lat, s.lon]);
+    const top = s.hops[s.hops.length - 1];
+    const color = css(KIND_VAR[top.kind]);
+    const label = s.hops.length > 1 ? `${s.hops[0].hop}+` : top.hop;
+    const html = s.hops.map(h => `<b>Hop ${h.hop}</b> ${esc(h.info.ip)}<br>${esc(netName(h.info))}<br><span style="opacity:.7">${esc(h.info.asn)} · ${h.rtt != null ? h.rtt.toFixed(1) + " ms" : ""}</span>`).join("<hr style='border:0;border-top:1px solid #ddd'>");
+    L.marker([s.lat, s.lon], { icon: L.divIcon({ className: "", html: `<div class="hopmark" style="background:${color}">${label}</div>`, iconSize: [22, 22], iconAnchor: [11, 11] }) })
+      .bindPopup(`${html}<br><span style="opacity:.7">${esc(place(top.info))}</span>`).addTo(routeLayer);
+  }
+  if (endState && dest && dest.lat != null && !hops.some(h => h.info && h.info.ip === dest.ip)) {
+    pts.push([dest.lat, dest.lon]);
+    L.marker([dest.lat, dest.lon], { icon: L.divIcon({ className: "", html: `<div class="hopmark" style="background:${css(KIND_VAR[dest.kind] || "--unknown")}">🎯</div>`, iconSize: [22, 22], iconAnchor: [11, 11] }) })
+      .bindPopup(`<b>Destination</b> ${esc(dest.ip)}<br>${esc(netName(dest))}<br>${esc(place(dest))}`).addTo(routeLayer);
+  }
+  if (pts.length > 1) {
+    L.polyline(pts, { color: css("--accent"), weight: 2.5, opacity: .8, dashArray: "6 6" }).addTo(routeLayer);
+    map.fitBounds(L.latLngBounds(pts).pad(0.25), { maxZoom: 6 });
+  } else if (pts.length === 1) map.setView(pts[0], 4);
+}
+
+/* ---------- live connections ---------- */
+let conns = [], connsLoaded = false, timer = null;
+$("#refresh").onclick = loadConns;
+$("#filter").oninput = renderConns;
+$("#auto").onchange = e => { clearInterval(timer); if (e.target.checked) timer = setInterval(loadConns, 10000); };
+
+async function loadConns() {
+  connsLoaded = true;
+  $("#refresh").disabled = true; $("#cstatus").textContent = "Reading connections…";
+  try {
+    const d = await (await fetch("/api/connections")).json();
+    if (d.error) throw new Error(d.error);
+    conns = d.items;
+    $("#cstatus").textContent = `${conns.length} remote endpoints across ${new Set(conns.map(c => c.process)).size} apps · updated ${new Date().toLocaleTimeString()}. Only apps running as your user are visible (run with sudo to see all).`;
+    renderConns();
+  } catch (e) { $("#cstatus").textContent = "Failed: " + e.message; }
+  $("#refresh").disabled = false;
+}
+
+function renderConns() {
+  const q = $("#filter").value.toLowerCase();
+  const rows = conns.filter(c => !q || [c.process, c.ip, c.info && netName(c.info), c.info && c.info.asn, c.info && place(c.info)].join(" ").toLowerCase().includes(q));
+  $("#conns").innerHTML = rows.length ? rows.map(c => {
+    const i = c.info || { kind: "unknown" };
+    return `<tr>
+      <td><b>${esc(c.process)}</b><div class="muted small">${esc(c.proto)} ${esc(c.states.join(", "))}${c.count > 1 ? ` · ×${c.count}` : ""}</div></td>
+      <td class="mono">${esc(c.ip)}<div class="muted small">${esc(i.host || "")}</div></td>
+      <td class="mono small">${esc(c.ports.slice(0, 4).join(", "))}${c.ports.length > 4 ? "…" : ""}</td>
+      <td>${badge(i.kind)}</td>
+      <td>${esc(i.kind === "local" ? i.label : netName(i)) || '<span class="muted">—</span>'}</td>
+      <td class="mono">${esc(i.asn || "")}</td>
+      <td>${esc(place(i))}</td>
+      <td>${i.kind !== "local" && c.ip.includes(".") ? `<button class="btn ghost small" data-trace="${esc(c.ip)}" style="padding:4px 10px">Trace</button>` : ""}</td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="8" class="empty">No connections match.</td></tr>`;
+  document.querySelectorAll("[data-trace]").forEach(b => b.onclick = () => { $("#target").value = b.dataset.trace; showTab("trace"); trace(b.dataset.trace); });
+
+  const tally = (keyFn) => { const m = new Map(); for (const c of rows) { const k = keyFn(c); if (!k) continue; const e = m.get(k.name) || { ...k, n: 0 }; e.n += c.count; m.set(k.name, e); } return [...m.values()].sort((a, b) => b.n - a.n).slice(0, 8); };
+  const bars = (list) => { const max = Math.max(1, ...list.map(x => x.n)); return list.map(x => `<div class="bar"><div class="lbl" title="${esc(x.name)}">${esc(x.name)}</div><div class="track"><div class="fill ${x.dc ? "dc" : ""}" style="width:${x.n / max * 100}%"></div></div><div class="num small muted">${x.n}</div></div>`).join("") || '<div class="muted small">Nothing yet.</div>'; };
+  $("#bynet").innerHTML = bars(tally(c => c.info && c.info.kind !== "local" && c.info.kind !== "unknown" ? { name: (c.info.isp || c.info.org) + (c.info.asn ? ` (${c.info.asn})` : ""), dc: c.info.kind === "datacenter" } : null));
+  $("#byapp").innerHTML = bars(tally(c => ({ name: c.process })));
+}
+</script>
+</body>
+</html>
