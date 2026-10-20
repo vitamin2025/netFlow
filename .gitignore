@@ -2,3 +2,9 @@
 __pycache__/
 *.pyc
 .DS_Store
+
+# Chrome extension signing key: never commit
+chrome-extension/keys/
+*.pem
+chrome-extension/dist/.verify/
+chrome-extension/dist/

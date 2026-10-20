@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "NetRoute",
+  "version": "1.0.0",
+  "description": "See which ISP, network and datacenter serves every site you visit, and trace the route your packets take to it.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "NetRoute",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["webRequest", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "minimum_chrome_version": "116"
+}

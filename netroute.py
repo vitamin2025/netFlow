@@ -250,6 +250,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+        elif url.path == "/api/health":
+            self._json({"ok": True, "app": "netroute"})
         elif url.path == "/api/me":
             self._json(lookup_self())
         elif url.path == "/api/connections":

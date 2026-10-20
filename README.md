@@ -15,6 +15,10 @@ Opens <http://127.0.0.1:8765>. Python 3 standard library only — nothing to ins
 
 Options (environment variables): `PORT=9000` to change the port, `NO_BROWSER=1` to not open a browser tab.
 
+## Chrome extension
+
+[`chrome-extension/`](chrome-extension/) adds NetRoute to your browser: a toolbar badge with the country of the server serving each tab (orange = datacenter), a popup listing every network the page talked to, and one-click route tracing through this app. Ready-to-install packages are in [`chrome-extension/dist/`](chrome-extension/dist/); see its [README](chrome-extension/README.md) to install.
+
 ## How it works
 
 | Piece | Source |
