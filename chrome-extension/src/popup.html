@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NetRoute</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="icons/icon32.png" width="20" height="20" alt="">
+    <h1>Net<span>Route</span></h1>
+    <span id="server-dot" class="dot-status" title="Checking NetRoute app…"></span>
+  </header>
+
+  <section id="site" class="card"><div class="muted">Loading…</div></section>
+
+  <section id="trace-card" class="card" hidden>
+    <div class="row">
+      <h2>Route to this server</h2>
+      <a id="open-full" href="#" class="link">Open full map ↗</a>
+    </div>
+    <div class="row gap">
+      <button id="trace-btn" class="btn">Trace route</button>
+      <span id="trace-status" class="muted small"></span>
+    </div>
+    <div id="chain" class="chain"></div>
+    <ol id="hops" class="hops"></ol>
+    <div id="server-help" class="help" hidden>
+      Route tracing needs the NetRoute app running on this Mac. In the netFlow folder, run:
+      <div class="cmd"><code>python3 netroute.py</code><button id="copy-cmd" class="mini">Copy</button></div>
+      then click <b>Trace route</b> again.
+    </div>
+  </section>
+
+  <section id="hosts-card" class="card" hidden>
+    <div class="row">
+      <h2 id="hosts-title">Connections from this page</h2>
+    </div>
+    <div id="hosts"></div>
+  </section>
+
+  <footer id="me" class="muted small">Detecting your ISP…</footer>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

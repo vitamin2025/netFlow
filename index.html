@@ -226,6 +226,9 @@ fetch("/api/me").then(r => r.json()).then(d => {
 let es = null, hops = [], startT = 0, dest = null, endState = null;
 
 $("#f").onsubmit = e => { e.preventDefault(); const t = $("#target").value.trim(); if (t) trace(t); };
+// Deep link from the browser extension: /?target=example.com starts a trace right away.
+const linked = new URLSearchParams(location.search).get("target");
+if (linked) { $("#target").value = linked; setTimeout(() => trace(linked), 300); }
 document.querySelectorAll(".chip").forEach(c => c.onclick = () => { $("#target").value = c.textContent; trace(c.textContent); });
 $("#stop").onclick = () => finish("Stopped.");
 
